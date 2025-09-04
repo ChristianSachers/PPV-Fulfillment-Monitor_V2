@@ -39,13 +39,212 @@ jest.mock('../../components/ProgressTracker', () => ({
   )
 }));
 
+// Mock console.error to catch rendering issues
+const originalError = console.error;
+let consoleErrors: string[] = [];
+
+// Error Boundary component to catch rendering errors
+class TestErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError?: (error: Error) => void },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    if (this.props.onError) {
+      this.props.onError(error);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div data-testid="error-boundary">
+          <h2>DataUpload Rendering Error</h2>
+          <pre>{this.state.error?.message}</pre>
+          <pre>{this.state.error?.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 describe('DataUpload Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    consoleErrors = [];
+    console.error = (...args: any[]) => {
+      consoleErrors.push(args.join(' '));
+      originalError(...args);
+    };
     // Mock successful validation by default
     mockedUploadService.validateFile.mockReturnValue({
       isValid: true,
       errors: []
+    });
+  });
+
+  afterEach(() => {
+    console.error = originalError;
+  });
+
+  describe('TDD RED Phase - Rendering Tests', () => {
+    test('DataUpload component renders without crashing', () => {
+      const errors: Error[] = [];
+      const onError = (error: Error) => errors.push(error);
+      
+      render(
+        <TestErrorBoundary onError={onError}>
+          <DataUpload />
+        </TestErrorBoundary>
+      );
+      
+      // This test should FAIL if there are rendering errors
+      expect(errors).toHaveLength(0);
+      expect(consoleErrors.filter(err => err.includes('Error')).length).toBe(0);
+      expect(screen.queryByTestId('error-boundary')).not.toBeInTheDocument();
+    });
+
+    test('renders Ant Design Card component correctly', () => {
+      render(<DataUpload />);
+      
+      // Test for Ant Design Card component - should fail if Card doesn't render
+      const cardElement = document.querySelector('.ant-card');
+      expect(cardElement).toBeInTheDocument();
+      expect(cardElement?.querySelector('.ant-card-body')).toBeInTheDocument();
+    });
+
+    test('renders Ant Design Button components correctly', () => {
+      render(<DataUpload />);
+      
+      // Test for Ant Design Button components - should fail if Buttons don't render
+      const buttonElements = document.querySelectorAll('.ant-btn');
+      expect(buttonElements.length).toBeGreaterThan(0);
+      
+      // Check specific buttons exist
+      const selectFilesButton = screen.getByText('Select Files');
+      expect(selectFilesButton.closest('.ant-btn')).toBeInTheDocument();
+      
+      const uploadButton = screen.getByTestId('upload-button');
+      expect(uploadButton.closest('.ant-btn')).toBeInTheDocument();
+    });
+
+    test('renders Ant Design Icons correctly', () => {
+      render(<DataUpload />);
+      
+      // Test icons render - should fail if @ant-design/icons has issues
+      const iconElements = document.querySelectorAll('[class*="anticon"]');
+      expect(iconElements.length).toBeGreaterThan(0);
+      
+      // Check for specific icons
+      expect(document.querySelector('[class*="anticon-upload"]')).toBeInTheDocument();
+    });
+
+    test('renders Ant Design Typography components correctly', () => {
+      render(<DataUpload />);
+      
+      // Test Typography Text component
+      const textElements = document.querySelectorAll('.ant-typography');
+      expect(textElements.length).toBeGreaterThan(0);
+    });
+
+    test('renders Ant Design Alert components when needed', async () => {
+      // Mock validation to show error alert
+      mockedUploadService.validateFile.mockReturnValue({
+        isValid: false,
+        errors: ['Test validation error']
+      });
+
+      render(<DataUpload />);
+      
+      const fileInput = screen.getByTestId('file-input');
+      const testFile = new File(['test'], 'test.txt', { type: 'text/plain' });
+      
+      fireEvent.change(fileInput, { target: { files: [testFile] } });
+      
+      // Should render Alert component for validation errors
+      await waitFor(() => {
+        const alertElement = document.querySelector('.ant-alert');
+        expect(alertElement).toBeInTheDocument();
+        expect(alertElement?.querySelector('.ant-alert-message')).toBeInTheDocument();
+      });
+    });
+
+    test('renders Ant Design Spin component during upload', async () => {
+      mockedUploadService.uploadFile.mockImplementation(() => 
+        new Promise(resolve => {
+          setTimeout(() => resolve({ upload_id: 'test-id' }), 1000);
+        })
+      );
+
+      render(<DataUpload />);
+      
+      const fileInput = screen.getByTestId('file-input');
+      const testFile = new File(['test content'], 'test.csv', { type: 'text/csv' });
+      
+      fireEvent.change(fileInput, { target: { files: [testFile] } });
+      
+      const uploadButton = screen.getByTestId('upload-button');
+      fireEvent.click(uploadButton);
+      
+      // Should render Spin component during upload
+      const spinElement = screen.getByTestId('upload-spinner');
+      expect(spinElement.closest('.ant-spin')).toBeInTheDocument();
+    });
+
+    test('no deprecation warnings from Ant Design components', () => {
+      render(<DataUpload />);
+      
+      // Should fail if there are Ant Design deprecation warnings
+      const deprecationWarnings = consoleErrors.filter(err => 
+        err.includes('deprecated') || err.includes('Warning')
+      );
+      expect(deprecationWarnings).toHaveLength(0);
+    });
+
+    test('no unhandled JavaScript errors during render', () => {
+      render(<DataUpload />);
+      
+      // Should fail if there are JavaScript runtime errors
+      const jsErrors = consoleErrors.filter(err => 
+        err.includes('TypeError') || 
+        err.includes('ReferenceError') || 
+        err.includes('SyntaxError')
+      );
+      expect(jsErrors).toHaveLength(0);
+    });
+
+    test('all DataUpload imports load successfully', () => {
+      // This test will fail if there are import/module loading issues
+      expect(() => {
+        require('../DataUpload');
+      }).not.toThrow();
+      
+      expect(() => {
+        require('../../services/uploadService');
+      }).not.toThrow();
+      
+      expect(() => {
+        require('../../components/ProgressTracker');
+      }).not.toThrow();
+    });
+
+    test('component mounts and unmounts cleanly', () => {
+      const { unmount } = render(<DataUpload />);
+      
+      // Should fail if component doesn't mount properly
+      expect(screen.getByText('Data Upload')).toBeInTheDocument();
+      
+      // Should fail if component doesn't unmount cleanly
+      expect(() => unmount()).not.toThrow();
     });
   });
 
