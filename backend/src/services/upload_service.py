@@ -21,8 +21,7 @@ async def save_uploaded_file(file: UploadFile, upload_dir: str) -> str:
     content = await file.read()
     
     # Open file and write content
-    file_handle = await aiofiles.open(file_path, 'wb')
-    async with file_handle as f:
+    async with aiofiles.open(file_path, 'wb') as f:
         await f.write(content)
     
     return file_path

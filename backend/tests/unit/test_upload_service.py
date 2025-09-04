@@ -19,17 +19,29 @@ def mock_db_session():
 class TestSaveUploadedFile:
     @pytest.mark.asyncio
     @patch('os.makedirs')
-    @patch('aiofiles.open', new_callable=AsyncMock)
-    async def test_saves_file_with_unique_name(self, mock_file_open, mock_makedirs, mock_upload_file):
-        result = await save_uploaded_file(mock_upload_file, "uploads/")
-        assert result.startswith("uploads/")
-        assert "test.csv" in result
-        assert len(result.split("/")[-1]) > len("test.csv")
-        mock_makedirs.assert_called_once()
+    async def test_saves_file_with_unique_name(self, mock_makedirs, mock_upload_file):
+        # Create proper async context manager mock
+        mock_file = AsyncMock()
+        mock_context_manager = AsyncMock()
+        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_file)
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+        
+        with patch('aiofiles.open', return_value=mock_context_manager):
+            result = await save_uploaded_file(mock_upload_file, "uploads/")
+            assert result.startswith("uploads/")
+            assert "test.csv" in result
+            assert len(result.split("/")[-1]) > len("test.csv")
+            mock_makedirs.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_creates_upload_directory(self, mock_upload_file):
-        with patch('aiofiles.open', new_callable=AsyncMock), patch('os.makedirs') as mock_makedirs:
+        # Create proper async context manager mock
+        mock_file = AsyncMock()
+        mock_context_manager = AsyncMock()
+        mock_context_manager.__aenter__ = AsyncMock(return_value=mock_file)
+        mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+        
+        with patch('aiofiles.open', return_value=mock_context_manager), patch('os.makedirs') as mock_makedirs:
             await save_uploaded_file(mock_upload_file, "new_dir/")
             mock_makedirs.assert_called_with("new_dir/", exist_ok=True)
 
