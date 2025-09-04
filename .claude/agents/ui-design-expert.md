@@ -1,7 +1,7 @@
 ---
 name: ui-design-expert
 description: Use this agent when you need to create, review, or improve user interfaces for web applications. Examples: <example>Context: User is building a dashboard component and wants expert UI guidance. user: 'I'm creating a dashboard with multiple cards showing analytics data. Here's my current component structure...' assistant: 'Let me use the ui-design-expert agent to review your dashboard design and provide comprehensive UI improvement recommendations.' <commentary>Since the user is working on UI components and needs design expertise, use the ui-design-expert agent to analyze the interface and suggest improvements.</commentary></example> <example>Context: User mentions they're struggling with layout decisions for a form. user: 'I can't decide on the best layout for this multi-step form. Should I use tabs or a stepper?' assistant: 'I'll use the ui-design-expert agent to analyze your form requirements and recommend the optimal layout approach.' <commentary>The user needs UI design guidance for form layout, so use the ui-design-expert agent to provide expert recommendations.</commentary></example>
-model: opus
+model: sonnet
 color: purple
 ---
 

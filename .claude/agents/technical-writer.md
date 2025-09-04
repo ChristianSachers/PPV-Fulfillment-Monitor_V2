@@ -1,7 +1,7 @@
 ---
 name: technical-writer
 description: Use this agent when you need to create, update, or maintain technical documentation. Examples: <example>Context: User has just implemented a new API endpoint and needs documentation updated. user: 'I just added a new POST /users endpoint that creates users with email and password fields' assistant: 'I'll use the technical-writer agent to update the API documentation with this new endpoint' <commentary>Since new functionality was added that affects user-facing documentation, use the technical-writer agent to ensure documentation stays current.</commentary></example> <example>Context: User has refactored code and existing documentation may be outdated. user: 'I refactored the authentication system to use JWT tokens instead of sessions' assistant: 'Let me use the technical-writer agent to review and update all authentication-related documentation' <commentary>Since core functionality changed, use the technical-writer agent to identify and update affected documentation.</commentary></example>
-model: haiku
+model: sonnet
 color: pink
 ---
 

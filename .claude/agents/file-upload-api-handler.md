@@ -1,7 +1,7 @@
 ---
 name: file-upload-api-handler
 description: Use this agent when handling file upload operations, API integrations, or data transfer scenarios. Examples: <example>Context: User needs to implement file upload functionality in their web application. user: 'I need to add file upload capability to my React app that can handle images and documents up to 10MB' assistant: 'I'll use the file-upload-api-handler agent to implement secure file upload functionality with proper validation and storage.' <commentary>Since the user needs file upload implementation, use the file-upload-api-handler agent to provide secure, best-practice solutions.</commentary></example> <example>Context: User is integrating with a third-party API that requires file transfers. user: 'How do I connect to the Dropbox API to upload files from my application?' assistant: 'Let me use the file-upload-api-handler agent to guide you through the Dropbox API integration with proper authentication and error handling.' <commentary>Since this involves API connections for file operations, use the file-upload-api-handler agent for expert guidance.</commentary></example>
-model: opus
+model: sonnet
 color: green
 ---
 
