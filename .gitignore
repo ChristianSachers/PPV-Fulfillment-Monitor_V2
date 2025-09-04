@@ -56,6 +56,35 @@ Desktop.ini
 .nyc_output
 *.lcov
 
+# Python Files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.tox/
+.coverage
+htmlcov/
+.coverage.*
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
 # Temporary Files
 *.tmp
 *.temp
