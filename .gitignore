@@ -56,6 +56,15 @@ Desktop.ini
 .nyc_output
 *.lcov
 
+# Python Files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+
 # Temporary Files
 *.tmp
 *.temp
