@@ -14,6 +14,7 @@ Web application with database persistence, file upload capabilities, and API int
 - always provide progress information when performing a task (e.g. 10% done, 20% done, ...)
 - always keep the documentation up to date
 - always use the appropriate agent for each task
+- commit messages must be short, bulletpoint style and descriptive
 
 ## Key Commands
 
