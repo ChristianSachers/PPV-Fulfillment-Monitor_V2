@@ -12,20 +12,30 @@ Web application with database persistence, file upload capabilities, and API int
 - never assume anything. if you have questions, directly ask the User
 - if the users asks for bigger tasks, propose a multi-step plan. each step must be small enough to be executable in less than 2 minutes
 - always provide progress information when performing a task (e.g. 10% done, 20% done, ...)
-- always keep the documentation up to date 
+- always keep the documentation up to date
+- always use the appropriate agent for each task
 
 ## Key Commands
 
 ### Development
 ```bash
-# Frontend development server
-npm run dev
+# Start both frontend and backend servers
+./start-dev.sh
 
-# Backend development server  
-npm run start:dev
+# Stop development servers
+./stop-dev.sh
+# Or use Ctrl+C to stop
 
-# Database migrations
-npm run db:migrate
+# Backend only (FastAPI on port 8001)
+cd backend && python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8001 --reload
+
+# Frontend only (React TypeScript on port 3001)
+cd frontend && npm run dev
+
+# Database operations (local PostgreSQL)
+psql -d ppv_fulfillment_dev  # Connect to database
+pg_dump ppv_fulfillment_dev > backup.sql  # Backup database
+psql -d ppv_fulfillment_dev < backup.sql  # Restore database
 
 # Run tests
 npm test
@@ -34,13 +44,10 @@ npm test
 ### Build & Deploy
 ```bash
 # Build frontend
-npm run build
+cd frontend && npm run build
 
 # Start production server
-npm start
-
-# Docker containers
-docker-compose up -d
+cd backend && python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8001
 ```
 
 📁 Project Structure:
@@ -87,7 +94,9 @@ docker-compose up -d
   └── [config files]     # .gitignore, docker-compose.yml, etc.
 
 ## Database
-- Development: Local database via Docker
+- Development: Local PostgreSQL 15 (installed via Homebrew)
+- Database name: `ppv_fulfillment_dev`
+- Connection: Local PostgreSQL server on default port 5432
 - Production: Configured via environment variables
 
 ## File Uploads
