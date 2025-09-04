@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: ppv-postgres
+    environment:
+      POSTGRES_DB: ppv_fulfillment_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ppv-network
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: ppv-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ppv-network
+
+  # Backend FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ppv-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ppv_fulfillment_dev
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ppv-network
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ppv-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    networks:
+      - ppv-network
+    command: npm run dev -- --host 0.0.0.0 --port 3000
+
+  # Celery Worker for background tasks
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ppv-celery
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ppv_fulfillment_dev
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ppv-network
+    command: celery -A src.celery_app worker --loglevel=info
+
+volumes:
+  postgres_data:
+
+networks:
+  ppv-network:
+    driver: bridge

@@ -1,0 +1,30 @@
+{
+  "development": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "ppv_fulfillment_dev",
+    "username": "postgres",
+    "password": "postgres",
+    "dialect": "postgresql",
+    "logging": true
+  },
+  "test": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "ppv_fulfillment_test",
+    "username": "postgres",
+    "password": "postgres",
+    "dialect": "postgresql",
+    "logging": false
+  },
+  "production": {
+    "host": "${DB_HOST}",
+    "port": "${DB_PORT}",
+    "database": "${DB_NAME}",
+    "username": "${DB_USER}",
+    "password": "${DB_PASSWORD}",
+    "dialect": "postgresql",
+    "logging": false,
+    "ssl": true
+  }
+}
