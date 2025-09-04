@@ -64,6 +64,26 @@ __pycache__/
 .Python
 *.egg-info/
 .pytest_cache/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+*.pyo
+*.pyd
+dist/
+build/
+.tox/
+.coverage
+htmlcov/
+.coverage.*
+
+# Jupyter Notebook
+.ipynb_checkpoints
 
 # Temporary Files
 *.tmp

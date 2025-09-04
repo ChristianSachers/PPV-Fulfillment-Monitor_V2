@@ -1,15 +1,17 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Menu } from 'antd';
-import { DashboardOutlined, UploadOutlined, AnalyticsOutlined } from '@ant-design/icons';
+import { DashboardOutlined, UploadOutlined, BarChartOutlined } from '@ant-design/icons';
 import Dashboard from './pages/Dashboard';
-import DataUpload from './pages/DataUpload';
 import Analytics from './pages/Analytics';
-import './styles/App.css';
+import DataUpload from './pages/DataUpload';
 
 const { Header, Content, Sider } = Layout;
 
 const App: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const menuItems = [
     {
       key: '/',
@@ -23,10 +25,14 @@ const App: React.FC = () => {
     },
     {
       key: '/analytics',
-      icon: <AnalyticsOutlined />,
+      icon: <BarChartOutlined />,
       label: 'Analytics',
     },
   ];
+
+  const handleMenuClick = (e: any) => {
+    navigate(e.key);
+  };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -40,9 +46,10 @@ const App: React.FC = () => {
         <Sider width={200} style={{ background: '#fff' }}>
           <Menu
             mode="inline"
-            defaultSelectedKeys={['/']}
+            selectedKeys={[location.pathname]}
             style={{ height: '100%', border: 'none' }}
             items={menuItems}
+            onClick={handleMenuClick}
           />
         </Sider>
         

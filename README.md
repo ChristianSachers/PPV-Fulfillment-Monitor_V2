@@ -1,0 +1,57 @@
+# PPV Fulfillment Monitor
+
+A simple web application that makes uploading and tracking your data files effortless. Upload CSV, Excel, or JSON files and get instant feedback with built-in validation and progress tracking.
+
+## What This App Does
+
+- **Easy file uploads** - Drag and drop or click to upload your data files
+- **Real-time progress** - Watch your uploads happen with live progress bars
+- **Smart validation** - Automatically checks your files for errors before processing
+- **Upload history** - Keep track of all your uploads in one dashboard
+- **Multiple formats** - Supports CSV, Excel (.xlsx, .xls), and JSON files
+
+## Getting Started
+
+### 1. Start the Application
+```bash
+./start-dev.sh
+```
+Wait a moment for everything to load up.
+
+### 2. Access Your App
+Open your web browser and go to: **http://localhost:3000**
+
+### 3. Stop the Application
+When you're done, stop everything with:
+```bash
+./stop-dev.sh
+```
+
+## How to Upload Files
+
+1. **Open the app** at http://localhost:3000 in your browser
+2. **Go to Data Upload** - Click on the upload section from the main menu
+3. **Choose your file** - Click "Choose File" or just drag and drop your file
+4. **Hit Upload** - Click the upload button and watch the progress bar
+5. **View your results** - Check the Dashboard to see your upload history
+
+**Supported file types**: CSV (.csv), Excel (.xlsx, .xls), JSON (.json)  
+**Maximum file size**: 500MB per file
+
+## Troubleshooting
+
+**App won't start?**  
+Make sure you have Node.js and Python installed, then try running `./start-dev.sh` again.
+
+**Can't access the app?**  
+Check that http://localhost:3000 opens in your browser. If not, wait a minute and try again.
+
+**Upload not working?**  
+Make sure your file is under 500MB and is a CSV, Excel, or JSON file.
+
+**Still having issues?**  
+Stop the app with `./stop-dev.sh`, wait 10 seconds, then start it again with `./start-dev.sh`.
+
+## Need More Help?
+
+For technical setup, development, or advanced configuration, see the [DEVELOPER.md](DEVELOPER.md) file.

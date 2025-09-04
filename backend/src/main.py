@@ -4,6 +4,9 @@ from fastapi.responses import JSONResponse
 import os
 from dotenv import load_dotenv
 
+# Import routers
+from src.routes.uploads import router as uploads_router
+
 # Load environment variables
 load_dotenv()
 
@@ -24,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(uploads_router)
 
 @app.get("/")
 async def root():

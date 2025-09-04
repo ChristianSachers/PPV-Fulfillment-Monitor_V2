@@ -6,14 +6,57 @@ This file contains project-specific information and commands for Claude Code.
 Web application with database persistence, file upload capabilities, and API integration.
 
 ## User Rules - MUST BE RESPECTED AT ALL TIMES!
-- no modul or class is allowed to exceed 300 lines of code.
-- any code change that would bring a modul or class over 300 lines of code needs to be explained to the user and a proposal for splitting must be created
 - the first step of any change is to create a test case, no production code is allowed to be written without a test case upfront
 - never assume anything. if you have questions, directly ask the User
 - if the users asks for bigger tasks, propose a multi-step plan. each step must be small enough to be executable in less than 2 minutes
 - always provide progress information when performing a task (e.g. 10% done, 20% done, ...)
 - always keep the documentation up to date
 - always use the appropriate agent for each task
+- commit messages must be short, bulletpoint style and descriptive
+- use the challenging-mentor output style
+
+### File Organization & Component Design - MUST BE RESPECTED AT ALL TIMES
+  - **Cohesion Over Size**: Keep related functionality together. A 400-line component handling one user workflow is better than 4 artificially split 100-line components
+  - **Single Responsibility**: Each file should have one clear, well-defined purpose that can be explained in one sentence
+  - **Extract for Reusability**: If logic could be reused elsewhere, extract it to custom hooks, utilities, or services
+  - **UI Component Guidelines**:
+    - React components up to 500 lines are acceptable if handling a single user workflow
+    - Extract state management to custom hooks when logic exceeds 150 lines
+    - Split only when handling multiple unrelated features
+  - **Service/Utility Guidelines**:
+    - Keep focused utilities under 200 lines
+    - Split when handling multiple unrelated domains
+    - Configuration and type files have no size limits
+
+  ### Code Quality Indicators
+  - **Readability Test**: Can the file's purpose be understood within 30 seconds of opening it?
+  - **Testability**: Can the component/function be tested effectively with clear, focused test cases?
+  - **Naming Clarity**: Functions, variables, and components should have descriptive names that explain their purpose
+  - **TypeScript Usage**: All interfaces, props, and function signatures must be properly typed
+
+  ### When to Split Components
+  - **Multiple User Workflows**: Component handles distinct, unrelated user tasks
+  - **Mixed Concerns**: Component handles both UI rendering and business logic that could be extracted
+  - **Repeated Patterns**: When similar logic appears in multiple places, extract to shared utilities
+  - **Testing Complexity**: When tests become unwieldy due to component doing too many things
+
+  ### AI Agent Optimization
+  - **Clear Function Boundaries**: Use descriptive function names and proper separation
+  - **Comprehensive TypeScript**: Type everything to help AI understand intent and interfaces
+  - **Meaningful Comments**: Explain complex business logic, not obvious code
+  - **Consistent Patterns**: Follow established patterns within the codebase for predictability
+
+  ### Refactoring Triggers
+  - **Explain Before Enforcing**: Before suggesting splits, explain why the current structure might be improved
+  - **Quality Over Metrics**: Focus on improving maintainability, testability, and readability
+  - **Context Matters**: Consider the domain complexity - financial calculations, UI workflows, and data processing naturally require larger components
+  - **User Value**: Prioritize changes that improve user experience or developer productivity
+
+  ### Testing Requirements
+  - **Test-Driven Development**: Write tests before implementing new features
+  - **Component Testing**: Test user interactions and state changes, not implementation details
+  - **Integration Testing**: Verify API communication and data flow between components
+  - **Accessibility Testing**: Ensure keyboard navigation and screen reader compatibility
 
 ## Key Commands
 
