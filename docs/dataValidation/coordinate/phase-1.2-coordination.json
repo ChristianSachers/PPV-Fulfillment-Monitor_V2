@@ -1,0 +1,321 @@
+{
+  "phase": "1.2",
+  "phase_name": "Record Classification Engine",
+  "description": "Implement a sophisticated record classification engine that analyzes each uploaded record and categorizes it into one of four distinct categories: New Entries, Updated Entries, Unchanged Records, or Inconsistent Data",
+  "prerequisites": [
+    "Phase 1.1 (Upload Processing Pipeline) completed",
+    "Extended staging tables from Phase 1.1 with additional classification columns",
+    "Production database access for comparison (read-only)",
+    "Business rule specifications defined"
+  ],
+  "coordination_metadata": {
+    "created": "2024-09-09",
+    "last_updated": "2024-09-09",
+    "status_states": ["waiting", "in_progress", "finished"],
+    "agent_types": ["test-engineer", "backend-engineer"],
+    "update_instructions": "Agents must update their own task status by editing this file directly"
+  },
+  "tasks": {
+    "test_new_entry_validator": {
+      "task_id": "test_new_entry_validator",
+      "description": "Write comprehensive tests for new entry validation including UUID lookup, business rules validation, and cross-file consistency",
+      "assigned_agent": "test-engineer",
+      "status": "waiting",
+      "task_type": "test",
+      "dependencies": [],
+      "completion_criteria": "All test cases written and documented for new entry validation scenarios",
+      "priority": 1,
+      "estimated_duration_minutes": 45,
+      "test_coverage": [
+        "UUID not found in production database triggers 'new' classification",
+        "New campaign records validation against business rules (BIZ_1xx codes)",
+        "New performance records validation against business rules", 
+        "New entry counting and cataloging in extended staging tables",
+        "Cross-file new entry consistency (both Campaign and Performance files required)",
+        "Combined upload requirement enforcement (BIZ_105)",
+        "Integration compatibility with Phase 1.1 upload structures"
+      ]
+    },
+    "impl_new_entry_validator": {
+      "task_id": "impl_new_entry_validator", 
+      "description": "Implement NewEntryValidator class with UUID lookup, business rule validation, and integration with Phase 1.1 structures",
+      "assigned_agent": "backend-engineer",
+      "status": "waiting",
+      "task_type": "implementation",
+      "dependencies": ["test_new_entry_validator"],
+      "completion_criteria": "NewEntryValidator implemented and all tests passing",
+      "priority": 1,
+      "estimated_duration_minutes": 90,
+      "implementation_details": {
+        "reuse_patterns": "Phase 1.1 UUID validation patterns and database connections",
+        "extend_functionality": "Store results in extended staging table columns (phase_context='1.2')",
+        "enforce_requirements": "Reject incomplete uploads (missing Campaign or Performance file)",
+        "unified_response": "Return standardized processing response format"
+      }
+    },
+    "test_updated_entry_detector": {
+      "task_id": "test_updated_entry_detector",
+      "description": "Write comprehensive tests for updated entry detection including field-level change tracking and impression increase validation",
+      "assigned_agent": "test-engineer", 
+      "status": "waiting",
+      "task_type": "test",
+      "dependencies": [],
+      "completion_criteria": "All test cases written for updated entry detection scenarios",
+      "priority": 1,
+      "estimated_duration_minutes": 45,
+      "test_coverage": [
+        "ANY impression increase >0 detected as reasonable update",
+        "Field-level change tracking for each update",
+        "Update validation against business logic",
+        "Before/after data preservation for dashboard display",
+        "Update categorization (acceptable vs. concerning changes)"
+      ]
+    },
+    "impl_updated_entry_detector": {
+      "task_id": "impl_updated_entry_detector",
+      "description": "Implement UpdatedEntryDetector class with field-by-field comparison and change tracking",
+      "assigned_agent": "backend-engineer",
+      "status": "waiting", 
+      "task_type": "implementation",
+      "dependencies": ["test_updated_entry_detector"],
+      "completion_criteria": "UpdatedEntryDetector implemented and all tests passing",
+      "priority": 1,
+      "estimated_duration_minutes": 90,
+      "implementation_details": {
+        "reuse_patterns": "Phase 1.1 staging table structures for data comparison",
+        "extend_functionality": "Store change details in violation_details JSONB column",
+        "business_rule": "Any impression increase >0 is acceptable",
+        "flag_management": "Set variance_detected=true in extended staging table"
+      }
+    },
+    "test_unchanged_record_filter": {
+      "task_id": "test_unchanged_record_filter",
+      "description": "Write comprehensive tests for unchanged record detection and performance optimization",
+      "assigned_agent": "test-engineer",
+      "status": "waiting",
+      "task_type": "test", 
+      "dependencies": [],
+      "completion_criteria": "All test cases written for unchanged record filtering scenarios",
+      "priority": 1,
+      "estimated_duration_minutes": 30,
+      "test_coverage": [
+        "Identical record detection (all fields match production)",
+        "Unchanged record counting",
+        "Option to show/hide unchanged records in reports",
+        "Performance with large volumes of unchanged data"
+      ]
+    },
+    "impl_unchanged_record_filter": {
+      "task_id": "impl_unchanged_record_filter",
+      "description": "Implement UnchangedRecordFilter class with complete record comparison and performance optimization",
+      "assigned_agent": "backend-engineer",
+      "status": "waiting",
+      "task_type": "implementation",
+      "dependencies": ["test_unchanged_record_filter"],
+      "completion_criteria": "UnchangedRecordFilter implemented and all tests passing",
+      "priority": 1,
+      "estimated_duration_minutes": 60,
+      "implementation_details": {
+        "reuse_patterns": "Phase 1.1 record comparison utilities and database queries",
+        "extend_functionality": "Update extended staging table with flagged_for_review=false",
+        "performance_focus": "Optimization for large datasets",
+        "shared_coordination": "Use processing_batches table for batch coordination"
+      }
+    },
+    "test_inconsistent_data_detector": {
+      "task_id": "test_inconsistent_data_detector",
+      "description": "Write comprehensive tests for inconsistency detection with priority-based conflict resolution",
+      "assigned_agent": "test-engineer",
+      "status": "waiting",
+      "task_type": "test",
+      "dependencies": ["impl_new_entry_validator", "impl_updated_entry_detector", "impl_unchanged_record_filter"],
+      "completion_criteria": "All test cases written for inconsistency detection with priority handling", 
+      "priority": 2,
+      "estimated_duration_minutes": 60,
+      "test_coverage": [
+        "EXACT string matching for Deal name changes (Priority 5 - never acceptable)",
+        "ANY date modification flagging (Priority 6 - all date changes suspicious)",
+        "Impression decreases detection (Priority 4 - all decreases suspicious)",
+        "Mutual exclusion violations (Priority 8 - both Campaign & Deal IDs populated)",
+        "Cross-file consistency failures (Priority 3)",
+        "UUID orphaning detection (Priority 2)",
+        "Hierarchical name structure validation (Priority 7)",
+        "Priority-based conflict resolution when multiple rules apply",
+        "Complete violation tracking with all applicable reasons"
+      ]
+    },
+    "impl_inconsistent_data_detector": {
+      "task_id": "impl_inconsistent_data_detector",
+      "description": "Implement InconsistentDataDetector class with priority-based detection algorithm and conflict resolution",
+      "assigned_agent": "backend-engineer",
+      "status": "waiting",
+      "task_type": "implementation", 
+      "dependencies": ["test_inconsistent_data_detector"],
+      "completion_criteria": "InconsistentDataDetector implemented and all tests passing",
+      "priority": 2,
+      "estimated_duration_minutes": 120,
+      "implementation_details": {
+        "priority_algorithm": "Apply all 9 business rules, collect violations with priorities, use highest priority for primary classification",
+        "conflict_resolution": "Store complete violation list for detailed reporting",
+        "reuse_patterns": "Phase 1.1 UUID validation logic (VAL_010)",
+        "extend_functionality": "Deal name exact matching with BIZ_101 error code",
+        "unified_codes": "Use standardized error codes for all violations"
+      }
+    },
+    "test_cross_file_validator": {
+      "task_id": "test_cross_file_validator",
+      "description": "Write comprehensive tests for cross-file validation including combined upload requirements and relationship consistency",
+      "assigned_agent": "test-engineer",
+      "status": "waiting",
+      "task_type": "test",
+      "dependencies": ["impl_inconsistent_data_detector"],
+      "completion_criteria": "All test cases written for cross-file validation scenarios",
+      "priority": 3,
+      "estimated_duration_minutes": 45,
+      "test_coverage": [
+        "COMBINED UPLOAD REQUIREMENT (both Campaign and Performance required)",
+        "Campaign vs Deal mutual exclusivity in reporting files",
+        "EXACT string matching for Deal names between files",
+        "Hierarchical name parsing (' > ' structure validation)",
+        "Campaign name segment extraction and validation",
+        "Rejection of incomplete uploads (missing file pairs)",
+        "All cross-file inconsistencies flagged appropriately"
+      ]
+    },
+    "impl_cross_file_validator": {
+      "task_id": "impl_cross_file_validator",
+      "description": "Implement CrossFileValidator class with combined upload enforcement and relationship validation",
+      "assigned_agent": "backend-engineer",
+      "status": "waiting",
+      "task_type": "implementation",
+      "dependencies": ["test_cross_file_validator"],
+      "completion_criteria": "CrossFileValidator implemented and all tests passing",
+      "priority": 3,
+      "estimated_duration_minutes": 90,
+      "implementation_details": {
+        "reuse_patterns": "Phase 1.1 file upload tracking and batch management",
+        "extend_functionality": "Use shared processing_batches table for coordination",
+        "enforce_requirements": "Reject uploads missing Campaign or Performance file (BIZ_105)",
+        "exact_matching": "Deal name matching enforcement (case-sensitive) with BIZ_101",
+        "integration": "Coordinate with Phase 1.1 upload status tracking"
+      }
+    },
+    "test_classification_orchestrator": {
+      "task_id": "test_classification_orchestrator",
+      "description": "Write comprehensive integration tests for complete classification workflow with priority enforcement",
+      "assigned_agent": "test-engineer",
+      "status": "waiting",
+      "task_type": "test",
+      "dependencies": ["impl_cross_file_validator"],
+      "completion_criteria": "All integration test cases written for complete classification workflow",
+      "priority": 4,
+      "estimated_duration_minutes": 60,
+      "test_coverage": [
+        "End-to-end classification of mixed record batches with priority resolution",
+        "Rule application order follows business priority (1-9)",
+        "Classification result storage in staging database with violation details",
+        "Classification statistics generation including violation breakdowns",
+        "Classification performance with full file volumes",
+        "Error handling during classification process",
+        "Priority-based conflict resolution scenarios"
+      ]
+    },
+    "impl_classification_orchestrator": {
+      "task_id": "impl_classification_orchestrator",
+      "description": "Implement RecordClassificationEngine class as main orchestrator with priority-based workflow",
+      "assigned_agent": "backend-engineer", 
+      "status": "waiting",
+      "task_type": "implementation",
+      "dependencies": ["test_classification_orchestrator"],
+      "completion_criteria": "RecordClassificationEngine implemented and all tests passing",
+      "priority": 4,
+      "estimated_duration_minutes": 120,
+      "implementation_details": {
+        "priority_workflow": "Enforce Priority 1 (combined upload) at batch level before individual records",
+        "rule_application": "Apply Priorities 2-9 through InconsistentDataDetector for each record",
+        "integration_orchestration": "Coordinate with Phase 1.1 upload processing pipeline",
+        "extended_storage": "Store classification results in extended staging tables",
+        "unified_error_handling": "Handle errors using standardized error code system"
+      }
+    },
+    "test_result_storage": {
+      "task_id": "test_result_storage",
+      "description": "Write comprehensive tests for classification result storage and data retrieval",
+      "assigned_agent": "test-engineer",
+      "status": "waiting",
+      "task_type": "test",
+      "dependencies": ["test_classification_orchestrator"],
+      "completion_criteria": "All test cases written for result storage scenarios",
+      "priority": 4,
+      "estimated_duration_minutes": 30,
+      "test_coverage": [
+        "Classification results properly stored in staging tables",
+        "Classification metadata persistence (reasons, field changes)",
+        "Classification statistics calculation and storage",
+        "Data retrieval for dashboard consumption"
+      ]
+    },
+    "impl_result_storage": {
+      "task_id": "impl_result_storage",
+      "description": "Implement ClassificationResultStorage class for persisting classification results and metadata",
+      "assigned_agent": "backend-engineer",
+      "status": "waiting",
+      "task_type": "implementation",
+      "dependencies": ["test_result_storage", "impl_classification_orchestrator"],
+      "completion_criteria": "ClassificationResultStorage implemented and all tests passing",
+      "priority": 4,
+      "estimated_duration_minutes": 75,
+      "implementation_details": {
+        "reuse_patterns": "Phase 1.1 database connection and transaction patterns",
+        "extend_functionality": "Store individual record classifications in extended staging tables",
+        "phase_tracking": "Set phase_context='1.2' for all Phase 1.2 records",
+        "violation_storage": "Persist violation details in JSONB violation_details column",
+        "backward_compatibility": "Ensure Phase 1.1 dashboard can still access its data"
+      }
+    }
+  },
+  "business_rules": {
+    "priority_order": {
+      "1": "Combined upload requirement enforcement - REJECT incomplete uploads immediately",
+      "2": "UUID orphaning detection - Identify records without production matches", 
+      "3": "Cross-file relationship consistency - Validate Campaign/Performance relationships",
+      "4": "Impression decrease detection - Flag any impression decreases as suspicious",
+      "5": "Deal name exact matching enforcement - NEVER accept Deal name changes",
+      "6": "Date change inconsistency flagging - Flag ALL date modifications",
+      "7": "Hierarchical name structure validation - Validate ' > ' structure parsing",
+      "8": "Mutual exclusion rule violations - Flag Campaign & Deal ID conflicts",
+      "9": "New entry business rule validation - Validate new records against business rules"
+    },
+    "implementation_rule": "When multiple violations apply to the same record, apply the highest priority rule for classification and include all violations in the violation reasons list"
+  },
+  "success_criteria": {
+    "core_requirements": [
+      "100% of uploaded records receive exactly one classification",
+      "Combined upload requirement - reject incomplete file pairs", 
+      "New entries properly validated against business rules",
+      "Updated entries track specific field changes with before/after preservation",
+      "Unchanged records identified and counted but excluded from approval workflow",
+      "Inconsistent data flagged with specific violation reasons for user review"
+    ],
+    "business_rule_enforcement": [
+      "Deal name changes never accepted (exact string matching)",
+      "Impression increases >0 classified as reasonable updates",
+      "Date changes flagged as inconsistent for future rule derivation", 
+      "Only complete Campaign + Performance uploads accepted",
+      "Inconsistent classification trumps all other classifications"
+    ],
+    "performance_and_quality": [
+      "Cross-file validation catches relationship inconsistencies",
+      "Classification performance handles full file volumes (7,000+ campaigns, 1,000+ performance records)",
+      "Production database queries acceptable for comparison (read-only impact)",
+      "All classification results stored in extended staging database",
+      "Comprehensive test coverage with all edge cases handled gracefully",
+      "TDD approach maintained throughout implementation"
+    ]
+  },
+  "integration_architecture": {
+    "extended_staging_tables": "Phase 1.1 staging tables extended with phase_context, violation_details, flagged_for_review, variance_detected columns",
+    "unified_processing_response": "Standardized API response format compatible with both Phase 1.1 and 1.2",
+    "unified_error_codes": "VAL_001-VAL_099 (validation), BIZ_100-BIZ_199 (business), SYS_200-SYS_299 (system)"
+  }
+}
