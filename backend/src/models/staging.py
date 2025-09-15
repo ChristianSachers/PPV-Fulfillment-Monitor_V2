@@ -10,7 +10,7 @@ from sqlalchemy import (
     Column, String, Integer, DateTime, DECIMAL, Boolean, TEXT, Index,
     BIGINT, TIMESTAMP, Enum as SQLEnum
 )
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 
@@ -49,12 +49,19 @@ class CampaignsStaging(Base):
     created_at = Column(TIMESTAMP, nullable=False, default=func.now())
     updated_at = Column(TIMESTAMP, nullable=True, onupdate=func.now())
     
+    # Phase 1.2 extensions (nullable for backward compatibility)
+    phase_context = Column(String(10), nullable=True)  # Phase identifier ('1.1' or '1.2')
+    violation_details = Column(JSONB, nullable=True)    # Structured violation information
+    flagged_for_review = Column(Boolean, nullable=True) # Review requirement flag
+    variance_detected = Column(Boolean, nullable=True)  # Change detection flag
+    
     # Performance indexes
     __table_args__ = (
         Index('idx_campaigns_staging_batch_id', 'processing_batch_id'),
         Index('idx_campaigns_staging_buyer', 'buyer'),
         Index('idx_campaigns_staging_runtime_dates', 'start_date', 'end_date'),
         Index('idx_campaigns_staging_classification', 'record_classification'),
+        Index('idx_campaigns_staging_phase_context', 'phase_context'),  # Phase 1.2 index
     )
 
 
@@ -84,11 +91,18 @@ class ReportingStaging(Base):
     created_at = Column(TIMESTAMP, nullable=False, default=func.now())
     updated_at = Column(TIMESTAMP, nullable=True, onupdate=func.now())
     
+    # Phase 1.2 extensions (nullable for backward compatibility)
+    phase_context = Column(String(10), nullable=True)  # Phase identifier ('1.1' or '1.2')
+    violation_details = Column(JSONB, nullable=True)    # Structured violation information
+    flagged_for_review = Column(Boolean, nullable=True) # Review requirement flag
+    variance_detected = Column(Boolean, nullable=True)  # Change detection flag
+    
     # Performance indexes
     __table_args__ = (
         Index('idx_reporting_staging_batch_id', 'processing_batch_id'),
         Index('idx_reporting_staging_purchase_type', 'purchase_type'),
         Index('idx_reporting_staging_date_recorded', 'date_recorded'),
+        Index('idx_reporting_staging_phase_context', 'phase_context'),  # Phase 1.2 index
     )
 
 

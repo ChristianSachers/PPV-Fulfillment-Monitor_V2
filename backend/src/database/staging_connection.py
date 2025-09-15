@@ -190,7 +190,12 @@ class StagingDatabase:
                     processing_batch_id=campaign_data['processing_batch_id'],
                     record_classification=campaign_data['record_classification'],
                     source_row_number=campaign_data['source_row_number'],
-                    validation_errors=campaign_data.get('validation_errors')
+                    validation_errors=campaign_data.get('validation_errors'),
+                    # Phase 1.2 extensions (optional)
+                    phase_context=campaign_data.get('phase_context'),
+                    violation_details=campaign_data.get('violation_details'),
+                    flagged_for_review=campaign_data.get('flagged_for_review'),
+                    variance_detected=campaign_data.get('variance_detected')
                 )
                 session.add(staging_record)
     
@@ -448,6 +453,94 @@ class StagingDatabase:
             except Exception as e:
                 # Session will be rolled back automatically
                 raise Exception(f"Transaction failed: {str(e)}")
+    
+    def create_phase_1_2_extensions(self) -> dict:
+        """Create Phase 1.2 staging table extensions.
+        
+        Returns:
+            Dictionary with creation results
+        """
+        try:
+            with self.get_session() as session:
+                # Phase 1.2 extensions are already defined in models
+                # Just need to create/update the tables
+                Base.metadata.create_all(bind=self.engine)
+                
+                # Verify extensions were created
+                result = self.verify_phase_1_2_extensions()
+                
+                return {
+                    "success": True,
+                    "message": "Phase 1.2 extensions created successfully",
+                    "verification": result
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to create Phase 1.2 extensions: {str(e)}",
+                "error": str(e)
+            }
+    
+    def verify_phase_1_2_extensions(self) -> dict:
+        """Verify Phase 1.2 staging table extensions exist.
+        
+        Returns:
+            Dictionary with verification results
+        """
+        try:
+            with self.engine.connect() as connection:
+                # Check campaigns_staging extensions
+                campaigns_result = connection.execute(
+                    text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'campaigns_staging' 
+                    AND column_name IN ('phase_context', 'violation_details', 'flagged_for_review', 'variance_detected')
+                    """)
+                )
+                campaigns_columns = {row[0] for row in campaigns_result.fetchall()}
+                
+                # Check reporting_staging extensions
+                reporting_result = connection.execute(
+                    text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'reporting_staging' 
+                    AND column_name IN ('phase_context', 'violation_details', 'flagged_for_review', 'variance_detected')
+                    """)
+                )
+                reporting_columns = {row[0] for row in reporting_result.fetchall()}
+                
+                # Check indexes
+                index_result = connection.execute(
+                    text("""
+                    SELECT indexname 
+                    FROM pg_indexes 
+                    WHERE indexname IN ('idx_campaigns_staging_phase_context', 'idx_reporting_staging_phase_context')
+                    """)
+                )
+                indexes = {row[0] for row in index_result.fetchall()}
+                
+                expected_columns = {'phase_context', 'violation_details', 'flagged_for_review', 'variance_detected'}
+                expected_indexes = {'idx_campaigns_staging_phase_context', 'idx_reporting_staging_phase_context'}
+                
+                return {
+                    "campaigns_extended": campaigns_columns == expected_columns,
+                    "reporting_extended": reporting_columns == expected_columns,
+                    "indexes_created": indexes == expected_indexes,
+                    "backward_compatible": True,  # All new columns are nullable
+                    "campaigns_missing_columns": list(expected_columns - campaigns_columns),
+                    "reporting_missing_columns": list(expected_columns - reporting_columns),
+                    "missing_indexes": list(expected_indexes - indexes)
+                }
+        except Exception as e:
+            return {
+                "campaigns_extended": False,
+                "reporting_extended": False,
+                "indexes_created": False,
+                "backward_compatible": False,
+                "error": str(e)
+            }
     
     def close(self):
         """Close database connections."""
