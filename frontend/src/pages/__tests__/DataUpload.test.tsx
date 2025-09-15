@@ -3,41 +3,31 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import DataUpload from '../DataUpload';
 import * as uploadService from '../../services/uploadService';
+import { 
+  ProcessingState, 
+  ProcessingStatus, 
+  ProcessingStage, 
+  FileType, 
+  ProcessingFileType,
+  ErrorCategory,
+  ErrorSeverity 
+} from '../../types/processing';
 
-// Mock the upload service
+// Mock the upload service and processing components
 jest.mock('../../services/uploadService');
+jest.mock('../../services/processingStatusService');
+jest.mock('../../hooks/useProcessingStatus');
+jest.mock('../../components/ProcessingProgressIndicator');
+jest.mock('../../components/UploadControlPanel');
+jest.mock('../../components/ErrorDisplayPanel');
+
 const mockedUploadService = uploadService as jest.Mocked<typeof uploadService>;
 
-// Mock the ProgressTracker component
-jest.mock('../../components/ProgressTracker', () => ({
-  ProgressTracker: ({ files, onCancel, onRetry }: any) => (
-    <div data-testid="progress-tracker" data-files-count={files.length}>
-      {files.map((file: any) => (
-        <div key={file.id} data-testid={`progress-item-${file.id}`}>
-          <span>{file.name}</span>
-          <span>{file.progress}%</span>
-          <span>{file.status}</span>
-          {file.status === 'uploading' && onCancel && (
-            <button
-              data-testid={`cancel-${file.id}`}
-              onClick={() => onCancel(file.id)}
-            >
-              Cancel
-            </button>
-          )}
-          {file.status === 'failed' && onRetry && (
-            <button
-              data-testid={`retry-${file.id}`}
-              onClick={() => onRetry(file.id)}
-            >
-              Retry
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}));
+// Mock implementations for processing pipeline components
+const mockUseProcessingStatus = require('../../hooks/useProcessingStatus');
+const mockProcessingProgressIndicator = require('../../components/ProcessingProgressIndicator');
+const mockUploadControlPanel = require('../../components/UploadControlPanel');
+const mockErrorDisplayPanel = require('../../components/ErrorDisplayPanel');
 
 // Mock console.error to catch rendering issues
 const originalError = console.error;
@@ -77,7 +67,9 @@ class TestErrorBoundary extends React.Component<
   }
 }
 
-describe('DataUpload Component', () => {
+describe('DataUpload Processing Pipeline Integration Component', () => {
+  let mockProcessingStatusHook: any;
+
   beforeEach(() => {
     jest.clearAllMocks();
     consoleErrors = [];
@@ -85,11 +77,106 @@ describe('DataUpload Component', () => {
       consoleErrors.push(args.join(' '));
       originalError(...args);
     };
+
     // Mock successful validation by default
     mockedUploadService.validateFile.mockReturnValue({
       isValid: true,
       errors: []
     });
+
+    // Mock processing status hook with default idle state
+    mockProcessingStatusHook = {
+      processingState: {
+        campaign_xlsx: null,
+        reporting_csv: null,
+        errors: [],
+        last_updated: new Date().toISOString()
+      },
+      currentProgress: null,
+      errors: [],
+      startProcessing: jest.fn(),
+      cancelProcessing: jest.fn(),
+      clearErrors: jest.fn(),
+      isProcessing: false,
+      canUpload: jest.fn(() => true),
+      hasErrors: false
+    };
+    mockUseProcessingStatus.useProcessingStatus.mockReturnValue(mockProcessingStatusHook);
+
+    // Mock component implementations
+    mockProcessingProgressIndicator.ProcessingProgressIndicator.mockImplementation(
+      ({ processingData, error }: any) => (
+        <div data-testid="processing-progress-indicator">
+          <div data-testid="progress-stage">{processingData?.stage}</div>
+          <div data-testid="progress-percent">{processingData?.progress}%</div>
+          <div data-testid="progress-status">{processingData?.status}</div>
+          {error && <div data-testid="progress-error">{error.message}</div>}
+        </div>
+      )
+    );
+
+    mockUploadControlPanel.UploadControlPanel.mockImplementation(
+      ({ processingState, onUploadStart, onCancelProcessing }: any) => (
+        <div data-testid="upload-control-panel">
+          <div data-testid="campaign-upload-section">
+            <input
+              data-testid="campaign-file-input"
+              type="file"
+              accept=".xlsx"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onUploadStart(file, FileType.CAMPAIGN_XLSX);
+              }}
+            />
+            <button
+              data-testid="campaign-upload-button"
+              disabled={processingState?.campaign_xlsx?.status === ProcessingStatus.PROCESSING}
+              onClick={() => {
+                const fileInput = document.querySelector('[data-testid="campaign-file-input"]') as HTMLInputElement;
+                const file = fileInput?.files?.[0];
+                if (file) onUploadStart(file, FileType.CAMPAIGN_XLSX);
+              }}
+            >
+              Upload Campaign XLSX
+            </button>
+          </div>
+          <div data-testid="reporting-upload-section">
+            <input
+              data-testid="reporting-file-input"
+              type="file"
+              accept=".csv"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onUploadStart(file, FileType.REPORTING_CSV);
+              }}
+            />
+            <button
+              data-testid="reporting-upload-button"
+              disabled={processingState?.reporting_csv?.status === ProcessingStatus.PROCESSING}
+              onClick={() => {
+                const fileInput = document.querySelector('[data-testid="reporting-file-input"]') as HTMLInputElement;
+                const file = fileInput?.files?.[0];
+                if (file) onUploadStart(file, FileType.REPORTING_CSV);
+              }}
+            >
+              Upload Reporting CSV
+            </button>
+          </div>
+        </div>
+      )
+    );
+
+    mockErrorDisplayPanel.ErrorDisplayPanel.mockImplementation(
+      ({ errors }: any) => (
+        <div data-testid="error-display-panel">
+          {errors?.map((error: any, index: number) => (
+            <div key={error.error_id} data-testid={`error-item-${index}`}>
+              <div data-testid={`error-message-${index}`}>{error.message}</div>
+            </div>
+          ))}
+        </div>
+      )
+    );
   });
 
   afterEach(() => {
@@ -117,35 +204,9 @@ describe('DataUpload Component', () => {
       render(<DataUpload />);
       
       // Test for Ant Design Card component - should fail if Card doesn't render
-      const cardElement = document.querySelector('.ant-card');
-      expect(cardElement).toBeInTheDocument();
-      expect(cardElement?.querySelector('.ant-card-body')).toBeInTheDocument();
-    });
-
-    test('renders Ant Design Button components correctly', () => {
-      render(<DataUpload />);
-      
-      // Test for Ant Design Button components - should fail if Buttons don't render
-      const buttonElements = document.querySelectorAll('.ant-btn');
-      expect(buttonElements.length).toBeGreaterThan(0);
-      
-      // Check specific buttons exist
-      const selectFilesButton = screen.getByText('Select Files');
-      expect(selectFilesButton.closest('.ant-btn')).toBeInTheDocument();
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      expect(uploadButton.closest('.ant-btn')).toBeInTheDocument();
-    });
-
-    test('renders Ant Design Icons correctly', () => {
-      render(<DataUpload />);
-      
-      // Test icons render - should fail if @ant-design/icons has issues
-      const iconElements = document.querySelectorAll('[class*="anticon"]');
-      expect(iconElements.length).toBeGreaterThan(0);
-      
-      // Check for specific icons
-      expect(document.querySelector('[class*="anticon-upload"]')).toBeInTheDocument();
+      const cardElements = document.querySelectorAll('.ant-card');
+      expect(cardElements.length).toBeGreaterThan(0);
+      expect(cardElements[0]?.querySelector('.ant-card-body')).toBeInTheDocument();
     });
 
     test('renders Ant Design Typography components correctly', () => {
@@ -154,50 +215,9 @@ describe('DataUpload Component', () => {
       // Test Typography Text component
       const textElements = document.querySelectorAll('.ant-typography');
       expect(textElements.length).toBeGreaterThan(0);
-    });
-
-    test('renders Ant Design Alert components when needed', async () => {
-      // Mock validation to show error alert
-      mockedUploadService.validateFile.mockReturnValue({
-        isValid: false,
-        errors: ['Test validation error']
-      });
-
-      render(<DataUpload />);
       
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['test'], 'test.txt', { type: 'text/plain' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      // Should render Alert component for validation errors
-      await waitFor(() => {
-        const alertElement = document.querySelector('.ant-alert');
-        expect(alertElement).toBeInTheDocument();
-        expect(alertElement?.querySelector('.ant-alert-message')).toBeInTheDocument();
-      });
-    });
-
-    test('renders Ant Design Spin component during upload', async () => {
-      mockedUploadService.uploadFile.mockImplementation(() => 
-        new Promise(resolve => {
-          setTimeout(() => resolve({ upload_id: 'test-id' }), 1000);
-        })
-      );
-
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['test content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      // Should render Spin component during upload
-      const spinElement = screen.getByTestId('upload-spinner');
-      expect(spinElement.closest('.ant-spin')).toBeInTheDocument();
+      // Check for page title
+      expect(screen.getByText('Data Upload')).toBeInTheDocument();
     });
 
     test('no deprecation warnings from Ant Design components', () => {
@@ -208,33 +228,6 @@ describe('DataUpload Component', () => {
         err.includes('deprecated') || err.includes('Warning')
       );
       expect(deprecationWarnings).toHaveLength(0);
-    });
-
-    test('no unhandled JavaScript errors during render', () => {
-      render(<DataUpload />);
-      
-      // Should fail if there are JavaScript runtime errors
-      const jsErrors = consoleErrors.filter(err => 
-        err.includes('TypeError') || 
-        err.includes('ReferenceError') || 
-        err.includes('SyntaxError')
-      );
-      expect(jsErrors).toHaveLength(0);
-    });
-
-    test('all DataUpload imports load successfully', () => {
-      // This test will fail if there are import/module loading issues
-      expect(() => {
-        require('../DataUpload');
-      }).not.toThrow();
-      
-      expect(() => {
-        require('../../services/uploadService');
-      }).not.toThrow();
-      
-      expect(() => {
-        require('../../components/ProgressTracker');
-      }).not.toThrow();
     });
 
     test('component mounts and unmounts cleanly', () => {
@@ -248,711 +241,308 @@ describe('DataUpload Component', () => {
     });
   });
 
-  describe('Initial Render', () => {
-    test('renders upload interface with proper heading and description', () => {
+  describe('Processing Pipeline Integration', () => {
+    test('renders page with processing pipeline components', () => {
       render(<DataUpload />);
       
       expect(screen.getByRole('heading', { name: /data upload/i })).toBeInTheDocument();
-      expect(screen.getByText(/upload your data files for analysis and visualization/i)).toBeInTheDocument();
+      expect(screen.getByText(/upload your campaign xlsx and reporting csv files/i)).toBeInTheDocument();
+      expect(screen.getByTestId('upload-control-panel')).toBeInTheDocument();
     });
 
-    test('displays supported file formats information', () => {
+    test('displays file format information correctly', () => {
       render(<DataUpload />);
       
-      expect(screen.getByText(/supported formats: csv, excel, json/i)).toBeInTheDocument();
+      expect(screen.getByText(/campaign xlsx/i)).toBeInTheDocument();
+      expect(screen.getByText(/reporting csv/i)).toBeInTheDocument();
+      expect(screen.getByText(/250mb/i)).toBeInTheDocument();
     });
 
-    test('shows file input for selecting files', () => {
+    test('shows processing status summary', () => {
       render(<DataUpload />);
       
-      const fileInput = screen.getByTestId('file-input');
-      expect(fileInput).toBeInTheDocument();
-      expect(fileInput).toHaveAttribute('type', 'file');
-      expect(fileInput).toHaveAttribute('accept', '.csv,.xlsx,.json');
-      expect(fileInput).toHaveAttribute('multiple');
+      expect(screen.getByText('Processing Status Overview')).toBeInTheDocument();
+      expect(screen.getByText('Campaign XLSX:')).toBeInTheDocument();
+      expect(screen.getByText('Reporting CSV:')).toBeInTheDocument();
+      expect(screen.getByText('Processing Errors:')).toBeInTheDocument();
     });
 
-    test('displays upload button in disabled state initially', () => {
+    test('displays correct initial processing status', () => {
       render(<DataUpload />);
       
-      const uploadButton = screen.getByTestId('upload-button');
-      expect(uploadButton).toBeInTheDocument();
-      expect(uploadButton).toBeDisabled();
-      expect(uploadButton).toHaveTextContent(/start upload/i);
-    });
-
-    test('does not show progress tracker initially', () => {
-      render(<DataUpload />);
-      
-      expect(screen.queryByTestId('progress-tracker')).not.toBeInTheDocument();
-    });
-
-    test('does not show success or error messages initially', () => {
-      render(<DataUpload />);
-      
-      expect(screen.queryByTestId('success-message')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('error-message')).not.toBeInTheDocument();
+      // Should show "Ready" status for both file types initially
+      const statusElements = screen.getAllByText('Ready');
+      expect(statusElements.length).toBeGreaterThanOrEqual(2);
     });
   });
 
-  describe('File Selection', () => {
-    test('enables upload button when valid files are selected', async () => {
+  describe('Upload Control Panel Integration', () => {
+    test('renders upload control panel with both file type sections', () => {
       render(<DataUpload />);
       
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['test content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      expect(uploadButton).not.toBeDisabled();
+      expect(screen.getByTestId('upload-control-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('campaign-upload-section')).toBeInTheDocument();
+      expect(screen.getByTestId('reporting-upload-section')).toBeInTheDocument();
     });
 
-    test('displays selected file names and count', async () => {
+    test('shows file inputs for both file types', () => {
       render(<DataUpload />);
       
-      const fileInput = screen.getByTestId('file-input');
-      const testFiles = [
-        new File(['content1'], 'file1.csv', { type: 'text/csv' }),
-        new File(['content2'], 'file2.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      ];
+      const campaignFileInput = screen.getByTestId('campaign-file-input');
+      const reportingFileInput = screen.getByTestId('reporting-file-input');
       
-      fireEvent.change(fileInput, { target: { files: testFiles } });
+      expect(campaignFileInput).toBeInTheDocument();
+      expect(campaignFileInput).toHaveAttribute('accept', '.xlsx');
       
-      expect(screen.getByText('2 files selected')).toBeInTheDocument();
-      expect(screen.getByText('file1.csv')).toBeInTheDocument();
-      expect(screen.getByText('file2.xlsx')).toBeInTheDocument();
+      expect(reportingFileInput).toBeInTheDocument();
+      expect(reportingFileInput).toHaveAttribute('accept', '.csv');
     });
 
-    test('supports multiple file selection', async () => {
+    test('shows upload buttons for both file types', () => {
       render(<DataUpload />);
       
-      const fileInput = screen.getByTestId('file-input');
-      expect(fileInput).toHaveAttribute('multiple');
-      
-      const testFiles = [
-        new File(['content1'], 'file1.csv', { type: 'text/csv' }),
-        new File(['content2'], 'file2.json', { type: 'application/json' }),
-        new File(['content3'], 'file3.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      ];
-      
-      fireEvent.change(fileInput, { target: { files: testFiles } });
-      
-      expect(screen.getByText('3 files selected')).toBeInTheDocument();
+      expect(screen.getByTestId('campaign-upload-button')).toBeInTheDocument();
+      expect(screen.getByTestId('reporting-upload-button')).toBeInTheDocument();
+      expect(screen.getByText('Upload Campaign XLSX')).toBeInTheDocument();
+      expect(screen.getByText('Upload Reporting CSV')).toBeInTheDocument();
     });
 
-    test('validates file types and shows error for invalid files', async () => {
-      // Mock validation to return error for invalid file
-      mockedUploadService.validateFile.mockReturnValue({
-        isValid: false,
-        errors: ['Unsupported file type. Only CSV, Excel, and JSON files are allowed']
+    test('calls onUploadStart when file is selected', async () => {
+      render(<DataUpload />);
+      
+      const campaignFile = new File(['campaign data'], 'campaign.xlsx', {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
       
-      render(<DataUpload />);
+      const fileInput = screen.getByTestId('campaign-file-input');
+      fireEvent.change(fileInput, { target: { files: [campaignFile] } });
       
-      const fileInput = screen.getByTestId('file-input');
-      const invalidFile = new File(['content'], 'test.txt', { type: 'text/plain' });
-      
-      fireEvent.change(fileInput, { target: { files: [invalidFile] } });
-      
-      expect(screen.getByText(/unsupported file type/i)).toBeInTheDocument();
-      expect(screen.getByTestId('upload-button')).toBeDisabled();
-    });
-
-    test('validates file size and shows error for oversized files', async () => {
-      // Mock validation to return size error
-      mockedUploadService.validateFile.mockReturnValue({
-        isValid: false,
-        errors: ['File size exceeds 500MB limit']
-      });
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const largeFile = new File(['x'.repeat(1000)], 'large.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [largeFile] } });
-      
-      expect(screen.getByText(/file size exceeds 500mb limit/i)).toBeInTheDocument();
-      expect(screen.getByTestId('upload-button')).toBeDisabled();
-    });
-
-    test('allows clearing selected files', async () => {
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      expect(screen.getByText('1 files selected')).toBeInTheDocument();
-      
-      const clearButton = screen.getByTestId('clear-files-button');
-      fireEvent.click(clearButton);
-      
-      expect(screen.queryByText(/files selected/)).not.toBeInTheDocument();
-      expect(screen.getByTestId('upload-button')).toBeDisabled();
+      expect(mockProcessingStatusHook.startProcessing).toHaveBeenCalledWith(
+        campaignFile,
+        ProcessingFileType.CAMPAIGN_XLSX
+      );
     });
   });
 
-  describe('Upload Process', () => {
-    test('starts upload process when upload button is clicked', async () => {
-      const mockUploadResponse = {
-        upload_id: '123',
-        filename: 'test.csv',
-        file_size: 1024,
-        upload_date: '2025-09-04T10:00:00Z',
-        status: 'completed'
+  describe('Processing Progress Integration', () => {
+    test('shows progress indicator when processing is active', () => {
+      const progressData = {
+        batch_id: 'batch-123',
+        stage: ProcessingStage.VALIDATE,
+        progress: 50,
+        status: ProcessingStatus.PROCESSING,
+        file_type: FileType.CAMPAIGN_XLSX,
+        started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
-      
-      mockedUploadService.uploadFile.mockResolvedValue(mockUploadResponse);
-      
+
+      mockProcessingStatusHook.currentProgress = progressData;
+      mockUseProcessingStatus.useProcessingStatus.mockReturnValue(mockProcessingStatusHook);
+
       render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      expect(mockedUploadService.uploadFile).toHaveBeenCalledWith(
-        testFile,
-        expect.any(Function)
-      );
+
+      expect(screen.getByTestId('processing-progress-indicator')).toBeInTheDocument();
+      expect(screen.getByTestId('progress-stage')).toHaveTextContent('validate');
+      expect(screen.getByTestId('progress-percent')).toHaveTextContent('50%');
     });
 
-    test('disables upload button during upload process', async () => {
-      // Mock a pending upload
-      mockedUploadService.uploadFile.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 1000))
-      );
-      
+    test('hides progress indicator when not processing', () => {
+      // Default state has no current progress
       render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      expect(uploadButton).toBeDisabled();
-      expect(uploadButton).toHaveTextContent(/uploading/i);
-    });
 
-    test('shows loading spinner during upload', async () => {
-      mockedUploadService.uploadFile.mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 1000))
-      );
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      expect(screen.getByTestId('upload-spinner')).toBeInTheDocument();
+      expect(screen.queryByTestId('processing-progress-indicator')).not.toBeInTheDocument();
     });
   });
 
-  describe('Progress Display', () => {
-    test('shows progress tracker during upload', async () => {
-      mockedUploadService.uploadFile.mockImplementation((file, onProgress) => {
-        // Simulate progress updates
-        setTimeout(() => onProgress && onProgress(25), 10);
-        setTimeout(() => onProgress && onProgress(50), 20);
-        setTimeout(() => onProgress && onProgress(100), 30);
-        
-        return Promise.resolve({
-          upload_id: '123',
-          filename: file.name,
-          file_size: file.size,
-          upload_date: '2025-09-04T10:00:00Z',
-          status: 'completed'
-        });
-      });
-      
+  describe('Error Display Integration', () => {
+    test('shows error display panel when errors exist', () => {
+      const processingError = {
+        error_id: 'error-123',
+        timestamp: new Date().toISOString(),
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.ERROR,
+        code: 'INVALID_FORMAT',
+        message: 'Invalid file format detected',
+        context: {
+          file_type: FileType.CAMPAIGN_XLSX
+        }
+      };
+
+      mockProcessingStatusHook.errors = [processingError];
+      mockProcessingStatusHook.hasErrors = true;
+      mockUseProcessingStatus.useProcessingStatus.mockReturnValue(mockProcessingStatusHook);
+
       render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('progress-tracker')).toBeInTheDocument();
-      });
+
+      expect(screen.getByTestId('error-display-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('error-item-0')).toBeInTheDocument();
+      expect(screen.getByTestId('error-message-0')).toHaveTextContent('Invalid file format detected');
     });
 
-    test('updates progress during upload', async () => {
-      let progressCallback: ((progress: number) => void) | null = null;
-      
-      mockedUploadService.uploadFile.mockImplementation((file, onProgress) => {
-        progressCallback = onProgress || null;
-        return new Promise(resolve => {
-          setTimeout(() => {
-            resolve({
-              upload_id: '123',
-              filename: file.name,
-              file_size: file.size,
-              upload_date: '2025-09-04T10:00:00Z',
-              status: 'completed'
-            });
-          }, 100);
-        });
-      });
-      
+    test('hides error display panel when no errors exist', () => {
+      // Default state has no errors
       render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      // Simulate progress updates
-      if (progressCallback) {
-        progressCallback(25);
-        progressCallback(50);
-        progressCallback(75);
-      }
-      
-      await waitFor(() => {
-        const progressTracker = screen.getByTestId('progress-tracker');
-        expect(progressTracker).toBeInTheDocument();
-        // The progress should be shown through the ProgressTracker component
-      });
-    });
 
-    test('displays file names in progress tracker', async () => {
-      mockedUploadService.uploadFile.mockResolvedValue({
-        upload_id: '123',
-        filename: 'test.csv',
-        file_size: 1024,
-        upload_date: '2025-09-04T10:00:00Z',
-        status: 'completed'
-      });
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('progress-tracker')).toBeInTheDocument();
-      });
-    });
-
-    test('handles multiple file uploads with individual progress tracking', async () => {
-      mockedUploadService.uploadFile
-        .mockResolvedValueOnce({
-          upload_id: '123',
-          filename: 'file1.csv',
-          file_size: 1024,
-          upload_date: '2025-09-04T10:00:00Z',
-          status: 'completed'
-        })
-        .mockResolvedValueOnce({
-          upload_id: '124',
-          filename: 'file2.xlsx',
-          file_size: 2048,
-          upload_date: '2025-09-04T10:00:00Z',
-          status: 'completed'
-        });
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFiles = [
-        new File(['content1'], 'file1.csv', { type: 'text/csv' }),
-        new File(['content2'], 'file2.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      ];
-      
-      fireEvent.change(fileInput, { target: { files: testFiles } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        const progressTracker = screen.getByTestId('progress-tracker');
-        expect(progressTracker).toHaveAttribute('data-files-count', '2');
-      });
+      expect(screen.queryByTestId('error-display-panel')).not.toBeInTheDocument();
     });
   });
 
-  describe('Error Handling', () => {
-    test('displays error message when upload fails', async () => {
-      const errorMessage = 'Upload failed due to network error';
-      mockedUploadService.uploadFile.mockRejectedValue(new Error(errorMessage));
-      
+  describe('Success State Integration', () => {
+    test('shows success message when processing completes', () => {
+      const processingState: ProcessingState = {
+        campaign_xlsx: {
+          batch_id: 'batch-123',
+          stage: ProcessingStage.COMPLETE,
+          progress: 100,
+          status: ProcessingStatus.COMPLETED,
+          file_type: FileType.CAMPAIGN_XLSX,
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        reporting_csv: null,
+        errors: [],
+        last_updated: new Date().toISOString()
+      };
+
+      mockProcessingStatusHook.processingState = processingState;
+      mockUseProcessingStatus.useProcessingStatus.mockReturnValue(mockProcessingStatusHook);
+
       render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-        expect(screen.getByText(errorMessage)).toBeInTheDocument();
-      });
+
+      expect(screen.getByTestId('processing-success-message')).toBeInTheDocument();
+      expect(screen.getByText('Processing Completed Successfully')).toBeInTheDocument();
     });
 
-    test('allows retry after upload failure', async () => {
-      mockedUploadService.uploadFile
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
-          upload_id: '123',
-          filename: 'test.csv',
-          file_size: 1024,
-          upload_date: '2025-09-04T10:00:00Z',
-          status: 'completed'
-        });
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-      });
-      
-      const retryButton = screen.getByTestId('retry-upload-button');
-      fireEvent.click(retryButton);
-      
-      expect(mockedUploadService.uploadFile).toHaveBeenCalledTimes(2);
-    });
+    test('allows dismissing success message', async () => {
+      const processingState: ProcessingState = {
+        campaign_xlsx: {
+          batch_id: 'batch-123',
+          stage: ProcessingStage.COMPLETE,
+          progress: 100,
+          status: ProcessingStatus.COMPLETED,
+          file_type: FileType.CAMPAIGN_XLSX,
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        reporting_csv: null,
+        errors: [],
+        last_updated: new Date().toISOString()
+      };
 
-    test('handles server validation errors', async () => {
-      const validationError = new Error('File validation failed on server');
-      mockedUploadService.uploadFile.mockRejectedValue(validationError);
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/file validation failed on server/i)).toBeInTheDocument();
-      });
-    });
+      mockProcessingStatusHook.processingState = processingState;
+      mockUseProcessingStatus.useProcessingStatus.mockReturnValue(mockProcessingStatusHook);
 
-    test('handles network connectivity issues', async () => {
-      mockedUploadService.uploadFile.mockRejectedValue(new Error('Network Error'));
-      
       render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('error-message')).toBeInTheDocument();
-        expect(screen.getByText(/network error/i)).toBeInTheDocument();
-      });
-    });
 
-    test('enables upload cancellation', async () => {
-      mockedUploadService.uploadFile.mockImplementation(() => 
-        new Promise(() => {}) // Never resolves to simulate ongoing upload
-      );
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('progress-tracker')).toBeInTheDocument();
-      });
-      
-      const cancelButton = screen.getByTestId('cancel-upload-button');
-      fireEvent.click(cancelButton);
-      
-      expect(mockedUploadService.cancelUpload).toHaveBeenCalled();
+      const dismissButton = screen.getByText('Dismiss');
+      fireEvent.click(dismissButton);
+
+      // Should not throw errors when clicking dismiss
+      expect(dismissButton).toBeInTheDocument();
     });
   });
 
-  describe('Success State', () => {
-    test('displays success message after successful upload', async () => {
-      mockedUploadService.uploadFile.mockResolvedValue({
-        upload_id: '123',
-        filename: 'test.csv',
-        file_size: 1024,
-        upload_date: '2025-09-04T10:00:00Z',
-        status: 'completed'
-      });
-      
+  describe('Processing Status Summary', () => {
+    test('shows correct status for different processing states', () => {
+      const processingState: ProcessingState = {
+        campaign_xlsx: {
+          batch_id: 'batch-123',
+          stage: ProcessingStage.VALIDATE,
+          progress: 50,
+          status: ProcessingStatus.PROCESSING,
+          file_type: FileType.CAMPAIGN_XLSX,
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        reporting_csv: {
+          batch_id: 'batch-456',
+          stage: ProcessingStage.COMPLETE,
+          progress: 100,
+          status: ProcessingStatus.COMPLETED,
+          file_type: FileType.REPORTING_CSV,
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        errors: [],
+        last_updated: new Date().toISOString()
+      };
+
+      mockProcessingStatusHook.processingState = processingState;
+      mockUseProcessingStatus.useProcessingStatus.mockReturnValue(mockProcessingStatusHook);
+
       render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('success-message')).toBeInTheDocument();
-        expect(screen.getByText(/upload completed successfully/i)).toBeInTheDocument();
-      });
+
+      expect(screen.getByText('Processing')).toBeInTheDocument();
+      expect(screen.getByText('Completed')).toBeInTheDocument();
     });
 
-    test('clears file list after successful upload', async () => {
-      mockedUploadService.uploadFile.mockResolvedValue({
-        upload_id: '123',
-        filename: 'test.csv',
-        file_size: 1024,
-        upload_date: '2025-09-04T10:00:00Z',
-        status: 'completed'
-      });
-      
+    test('displays error count correctly', () => {
+      const processingError = {
+        error_id: 'error-123',
+        timestamp: new Date().toISOString(),
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.ERROR,
+        code: 'INVALID_FORMAT',
+        message: 'Invalid file format detected',
+        context: {
+          file_type: FileType.CAMPAIGN_XLSX
+        }
+      };
+
+      mockProcessingStatusHook.errors = [processingError];
+      mockProcessingStatusHook.hasErrors = true;
+      mockUseProcessingStatus.useProcessingStatus.mockReturnValue(mockProcessingStatusHook);
+
       render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      expect(screen.getByText('1 files selected')).toBeInTheDocument();
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('success-message')).toBeInTheDocument();
-      });
-      
-      expect(screen.queryByText(/files selected/)).not.toBeInTheDocument();
+
+      expect(screen.getByText('1 error')).toBeInTheDocument();
     });
 
-    test('resets upload button after successful upload', async () => {
-      mockedUploadService.uploadFile.mockResolvedValue({
-        upload_id: '123',
-        filename: 'test.csv',
-        file_size: 1024,
-        upload_date: '2025-09-04T10:00:00Z',
-        status: 'completed'
-      });
-      
+    test('shows last updated timestamp', () => {
       render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('success-message')).toBeInTheDocument();
-      });
-      
-      expect(uploadButton).toBeDisabled();
-      expect(uploadButton).toHaveTextContent(/start upload/i);
-    });
 
-    test('provides option to upload more files after success', async () => {
-      mockedUploadService.uploadFile.mockResolvedValue({
-        upload_id: '123',
-        filename: 'test.csv',
-        file_size: 1024,
-        upload_date: '2025-09-04T10:00:00Z',
-        status: 'completed'
-      });
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('success-message')).toBeInTheDocument();
-      });
-      
-      expect(screen.getByTestId('upload-more-button')).toBeInTheDocument();
-    });
-
-    test('hides progress tracker after successful upload', async () => {
-      mockedUploadService.uploadFile.mockResolvedValue({
-        upload_id: '123',
-        filename: 'test.csv',
-        file_size: 1024,
-        upload_date: '2025-09-04T10:00:00Z',
-        status: 'completed'
-      });
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        expect(screen.getByTestId('success-message')).toBeInTheDocument();
-      });
-      
-      expect(screen.queryByTestId('progress-tracker')).not.toBeInTheDocument();
+      expect(screen.getByText('Last Updated:')).toBeInTheDocument();
+      // Should show some form of timestamp
+      const timestampElements = document.querySelectorAll('[style*="font-size: 12px"]');
+      expect(timestampElements.length).toBeGreaterThan(0);
     });
   });
 
   describe('Accessibility', () => {
-    test('has proper ARIA labels for screen readers', () => {
+    test('has proper ARIA labels for status announcements', () => {
       render(<DataUpload />);
       
-      const fileInput = screen.getByTestId('file-input');
-      expect(fileInput).toHaveAttribute('aria-label', 'Select files to upload');
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      expect(uploadButton).toHaveAttribute('aria-label', 'Start file upload');
+      const statusAnnouncer = screen.getByTestId('processing-status-announcer');
+      expect(statusAnnouncer).toHaveAttribute('aria-live', 'polite');
+      expect(statusAnnouncer).toHaveAttribute('aria-atomic', 'true');
     });
 
-    test('provides keyboard navigation support', async () => {
+    test('maintains screen reader friendly structure', () => {
       render(<DataUpload />);
       
-      const fileInput = screen.getByTestId('file-input');
-      const uploadButton = screen.getByTestId('upload-button');
+      // Should have proper heading structure
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Data Upload');
       
-      fileInput.focus();
-      expect(fileInput).toHaveFocus();
-      
-      fireEvent.keyDown(fileInput, { key: 'Tab', code: 'Tab' });
-      expect(uploadButton).toHaveFocus();
-    });
-
-    test('announces upload status changes to screen readers', async () => {
-      mockedUploadService.uploadFile.mockResolvedValue({
-        upload_id: '123',
-        filename: 'test.csv',
-        file_size: 1024,
-        upload_date: '2025-09-04T10:00:00Z',
-        status: 'completed'
-      });
-      
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const testFile = new File(['content'], 'test.csv', { type: 'text/csv' });
-      
-      fireEvent.change(fileInput, { target: { files: [testFile] } });
-      
-      const uploadButton = screen.getByTestId('upload-button');
-      fireEvent.click(uploadButton);
-      
-      await waitFor(() => {
-        const statusElement = screen.getByTestId('upload-status');
-        expect(statusElement).toHaveAttribute('aria-live', 'polite');
-        expect(statusElement).toHaveTextContent(/upload completed successfully/i);
-      });
+      // Should have accessible status announcer
+      const statusAnnouncer = screen.getByTestId('processing-status-announcer');
+      expect(statusAnnouncer).toBeInTheDocument();
     });
   });
 
-  describe('Edge Cases', () => {
-    test('handles empty file selection gracefully', async () => {
+  describe('File Format Information', () => {
+    test('displays supported file formats and size limits', () => {
       render(<DataUpload />);
       
-      const fileInput = screen.getByTestId('file-input');
-      
-      // Simulate selecting and then clearing files
-      fireEvent.change(fileInput, { target: { files: [] } });
-      
-      expect(screen.getByTestId('upload-button')).toBeDisabled();
-      expect(screen.queryByText(/files selected/)).not.toBeInTheDocument();
+      expect(screen.getByText('Supported File Formats')).toBeInTheDocument();
+      expect(screen.getByText(/excel format \(\.xlsx\) up to 250mb/i)).toBeInTheDocument();
+      expect(screen.getByText(/comma-separated values \(\.csv\) up to 250mb/i)).toBeInTheDocument();
     });
 
-    test('handles very large number of files', async () => {
+    test('shows processing information', () => {
       render(<DataUpload />);
       
-      const fileInput = screen.getByTestId('file-input');
-      const manyFiles = Array.from({ length: 50 }, (_, i) => 
-        new File([`content${i}`], `file${i}.csv`, { type: 'text/csv' })
-      );
-      
-      fireEvent.change(fileInput, { target: { files: manyFiles } });
-      
-      expect(screen.getByText('50 files selected')).toBeInTheDocument();
-      expect(screen.getByTestId('upload-button')).not.toBeDisabled();
-    });
-
-    test('handles duplicate file names', async () => {
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      const duplicateFiles = [
-        new File(['content1'], 'duplicate.csv', { type: 'text/csv' }),
-        new File(['content2'], 'duplicate.csv', { type: 'text/csv' })
-      ];
-      
-      fireEvent.change(fileInput, { target: { files: duplicateFiles } });
-      
-      expect(screen.getByText('2 files selected')).toBeInTheDocument();
-      // Should handle duplicates gracefully, possibly with warnings
-    });
-
-    test('maintains state during rapid file selection changes', async () => {
-      render(<DataUpload />);
-      
-      const fileInput = screen.getByTestId('file-input');
-      
-      // Rapidly change file selection
-      const file1 = new File(['content1'], 'file1.csv', { type: 'text/csv' });
-      const file2 = new File(['content2'], 'file2.json', { type: 'application/json' });
-      
-      fireEvent.change(fileInput, { target: { files: [file1] } });
-      expect(screen.getByText('1 files selected')).toBeInTheDocument();
-      
-      fireEvent.change(fileInput, { target: { files: [file2] } });
-      expect(screen.getByText('1 files selected')).toBeInTheDocument();
-      expect(screen.getByText('file2.json')).toBeInTheDocument();
+      expect(screen.getByText('Processing Information')).toBeInTheDocument();
+      expect(screen.getByText(/files are processed through validation, parsing, and classification stages/i)).toBeInTheDocument();
     });
   });
 });

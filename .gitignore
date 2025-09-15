@@ -22,6 +22,8 @@ yarn-error.log*
 # File Uploads
 /uploads/
 /backend/uploads/
+*large*.csv
+*test*.csv
 *.log
 
 # Database Files
@@ -53,6 +55,7 @@ Desktop.ini
 
 # Test & Coverage
 /coverage/
+/frontend/coverage/
 .nyc_output
 *.lcov
 
@@ -81,6 +84,7 @@ build/
 .coverage
 htmlcov/
 .coverage.*
+*.pcy
 
 # Jupyter Notebook
 .ipynb_checkpoints

@@ -223,7 +223,7 @@ class MigrationRunner:
                         'version_to': row[4],
                         'status': row[5],
                         'execution_time': float(row[6]),
-                        'executed_at': row[7].isoformat() if row[7] else None,
+                        'executed_at': row[7].isoformat() if hasattr(row[7], 'isoformat') and row[7] else (row[7] if row[7] else None),
                         'error_message': row[8],
                         'metadata': row[9]
                     }

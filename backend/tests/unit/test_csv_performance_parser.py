@@ -505,7 +505,12 @@ class TestCSVDatabaseIntegration:
         # Mock database session
         mock_db_session = MagicMock()
         mock_staging_db = MagicMock()
-        mock_staging_db.get_session.return_value = iter([mock_db_session])  # Return iterator with session
+        
+        # Mock get_session to return a context manager
+        mock_context_manager = MagicMock()
+        mock_context_manager.__enter__.return_value = mock_db_session
+        mock_context_manager.__exit__.return_value = None
+        mock_staging_db.get_session.return_value = mock_context_manager
         mock_staging_db_class.return_value = mock_staging_db
         
         # Mock row validation to return valid data
@@ -530,7 +535,7 @@ class TestCSVDatabaseIntegration:
         assert records_processed == 2
         assert len(errors) == 0
         assert mock_db_session.add.call_count == 2
-        # Commit is handled by the StagingDatabase generator
+        # Commit is handled by the StagingDatabase context manager
         
         # Verify ReportingStaging objects were created correctly
         staging_calls = mock_db_session.add.call_args_list

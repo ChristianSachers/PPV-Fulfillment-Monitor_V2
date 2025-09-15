@@ -74,9 +74,9 @@ class TestUploadEndpointPOST:
         assert "upload_id" in data
 
     def test_upload_file_size_validation(self):
-        """Test file size validation (reject >500MB files)."""
+        """Test file size validation (reject >250MB files)."""
         # Create mock large file content
-        large_content = b"x" * (500 * 1024 * 1024 + 1)  # Just over 500MB
+        large_content = b"x" * (250 * 1024 * 1024 + 1)  # Just over 250MB
         files = {"file": ("large.csv", BytesIO(large_content), "text/csv")}
         response = client.post("/api/uploads/", files=files)
         

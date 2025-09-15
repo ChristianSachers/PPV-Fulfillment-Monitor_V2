@@ -3,8 +3,8 @@
     "host": "localhost",
     "port": 5432,
     "database": "ppv_fulfillment_dev",
-    "username": "postgres",
-    "password": "postgres",
+    "username": "christiansachers",
+    "password": "",
     "dialect": "postgresql",
     "logging": true
   },
@@ -12,8 +12,8 @@
     "host": "localhost",
     "port": 5432,
     "database": "ppv_fulfillment_test",
-    "username": "postgres",
-    "password": "postgres",
+    "username": "christiansachers",
+    "password": "",
     "dialect": "postgresql",
     "logging": false
   },

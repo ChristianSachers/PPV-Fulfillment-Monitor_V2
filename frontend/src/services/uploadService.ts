@@ -130,10 +130,10 @@ export const validateFile = (file: File): ValidationResult => {
     errors.push('File cannot be empty');
   }
   
-  // Check file size (500MB limit)
-  const maxSize = 500 * 1024 * 1024; // 500MB in bytes
+  // Check file size (250MB limit)
+  const maxSize = 250 * 1024 * 1024; // 250MB in bytes
   if (file.size > maxSize) {
-    errors.push('File size exceeds 500MB limit');
+    errors.push('File size exceeds 250MB limit');
   }
   
   // Check file type

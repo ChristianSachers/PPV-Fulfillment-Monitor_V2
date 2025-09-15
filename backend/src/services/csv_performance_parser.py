@@ -341,8 +341,8 @@ class CSVPerformanceParser:
             # Use StagingDatabase for cleaner session management
             staging_db = StagingDatabase()
             
-            # Use the generator pattern
-            for session in staging_db.get_session():
+            # Use the context manager pattern
+            with staging_db.get_session() as session:
                 for i, row in enumerate(chunk_data):
                     row_number = ((chunk_number - 1) * self.chunk_size) + i + 1
                     
@@ -365,8 +365,7 @@ class CSVPerformanceParser:
                         for error in validation_result.errors:
                             errors.append(error)
                 
-                # Session commit/rollback is handled by the generator
-                break  # Only iterate once
+                # Session commit/rollback is handled by the context manager
                 
         except Exception as e:
             errors.append(f"Database error processing chunk {chunk_number}: {str(e)}")

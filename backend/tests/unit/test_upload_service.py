@@ -48,11 +48,11 @@ class TestSaveUploadedFile:
 class TestStoreFileMetadata:
     @pytest.mark.asyncio
     async def test_creates_database_record(self, mock_db_session):
-        file_info = {"filename": "test.csv", "file_size": 1024, "file_type": "text/csv"}
+        file_info = {"filename": "test.csv", "file_size": 1024, "mime_type": "text/csv"}  # Updated to use mime_type
         result = await store_file_metadata(file_info, mock_db_session)
         assert isinstance(result, DataUpload)
         mock_db_session.add.assert_called_once()
-        mock_db_session.commit.assert_called_once()
+        # Note: No longer testing commit() since we removed manual commit
 
     @pytest.mark.asyncio
     async def test_handles_database_error(self, mock_db_session):

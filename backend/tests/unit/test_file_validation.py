@@ -40,16 +40,16 @@ class TestValidateFileType:
 class TestValidateFileSize:
     
     def test_files_under_limit_accepted(self):
-        """Test files under 500MB limit are accepted"""
-        assert validate_file_size(100 * 1024 * 1024, 500) is True  # 100MB
+        """Test files under 250MB limit are accepted"""
+        assert validate_file_size(100 * 1024 * 1024, 250) is True  # 100MB
         
     def test_files_at_limit_accepted(self):
-        """Test files exactly at 500MB limit are accepted"""
-        assert validate_file_size(500 * 1024 * 1024, 500) is True  # 500MB
+        """Test files exactly at 250MB limit are accepted"""
+        assert validate_file_size(250 * 1024 * 1024, 250) is True  # 250MB
         
     def test_files_over_limit_rejected(self):
-        """Test files over 500MB limit are rejected"""
-        assert validate_file_size(600 * 1024 * 1024, 500) is False  # 600MB
+        """Test files over 250MB limit are rejected"""
+        assert validate_file_size(300 * 1024 * 1024, 250) is False  # 300MB
         
     def test_negative_file_sizes_rejected(self):
         """Test negative file sizes are rejected"""

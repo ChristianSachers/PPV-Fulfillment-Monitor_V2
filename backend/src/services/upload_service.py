@@ -30,16 +30,16 @@ async def save_uploaded_file(file: UploadFile, upload_dir: str) -> str:
 async def store_file_metadata(file_info: dict, db: Session) -> DataUpload:
     """Create DataUpload database record"""
     upload = DataUpload(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),  # Use UUID object, not string
         filename=file_info["filename"],
         file_size=file_info["file_size"],
-        file_type=file_info["file_type"],
+        mime_type=file_info["mime_type"],  # Updated to match database schema
         status=file_info.get("status", "pending"),
         created_at=datetime.now()
     )
     
     db.add(upload)
-    db.commit()
+    # Note: No manual commit - let FastAPI dependency injection handle session lifecycle
     
     return upload
 

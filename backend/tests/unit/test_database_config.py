@@ -69,22 +69,24 @@ class TestDatabaseConfig:
     
     def test_get_db_dependency_yields_session(self):
         """Test database dependency function yields session and closes it."""
-        with patch('src.config.database.get_session_local') as mock_session_local:
-            mock_session = MagicMock()
-            mock_session_local.return_value = MagicMock(return_value=mock_session)
-            
-            db_gen = get_db()
-            session = next(db_gen)
-            
-            assert session == mock_session
-            
-            # Test cleanup
-            try:
-                next(db_gen)
-            except StopIteration:
-                pass
-            
-            mock_session.close.assert_called_once()
+        # Reset global session_local to ensure clean test state
+        with patch('src.config.database._session_local', None):
+            with patch('src.config.database.get_session_local') as mock_session_local:
+                mock_session = MagicMock()
+                mock_session_local.return_value = MagicMock(return_value=mock_session)
+                
+                db_gen = get_db()
+                session = next(db_gen)
+                
+                assert session == mock_session
+                
+                # Test cleanup
+                try:
+                    next(db_gen)
+                except StopIteration:
+                    pass
+                
+                mock_session.close.assert_called_once()
     
     def test_database_config_class_loads_config(self):
         """Test DatabaseConfig class loads configuration from JSON."""

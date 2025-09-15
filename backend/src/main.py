@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 # Import routers
 from src.routes.uploads import router as uploads_router
+from src.routes.upload_processing import router as upload_processing_router
 
 # Load environment variables
 load_dotenv()
@@ -30,6 +31,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(uploads_router)
+app.include_router(upload_processing_router)
 
 @app.get("/")
 async def root():
